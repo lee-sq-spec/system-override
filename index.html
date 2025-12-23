@@ -1,19 +1,28 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>DERR-01 SYSTEM FINAL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DERR-01 SYSTEM SECURE</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Courier New', Courier, monospace; }
+        
+        /* 阶段 1: 白屏 */
         #stage-welcome { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; justify-content: center; align-items: center; z-index: 100; transition: opacity 1.5s ease; }
         #stage-welcome h1 { color: #333; font-size: 3rem; letter-spacing: 10px; }
+        
+        /* 阶段 2: 矩阵雨 (纯数字/字母/符号) */
         #matrix-canvas { position: fixed; top: 0; left: 0; z-index: 10; display: none; transition: opacity 2s ease; }
+        
+        /* 阶段 3 & 4: 3D 地球与 HUD */
         #earth-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; display: none; }
-        #hud-overlay { position: fixed; right: 40px; bottom: 40px; color: #00ffcc; text-shadow: 0 0 5px #00ffcc; z-index: 20; display: none; transition: all 1s ease; }
+        #hud-overlay { position: fixed; right: 40px; bottom: 40px; color: #00ffcc; text-shadow: 0 0 5px #00ffcc; z-index: 20; display: none; transition: all 1s ease; border: 1px solid transparent; }
         .hud-line { margin: 5px 0; font-size: 1.2rem; border-left: 3px solid #00ffcc; padding-left: 10px; }
+        
+        /* 扫描线 */
         #scanner { width: 100%; height: 2px; background: rgba(0, 255, 204, 0.6); position: absolute; top: 0; left: 0; display: none; box-shadow: 0 0 15px #00ffcc; z-index: 25; pointer-events: none; }
         
-        /* 动画类 */
+        /* 状态类 */
         .blink { animation: blink-anim 0.5s infinite; }
         @keyframes blink-anim { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         .fade-out { opacity: 0 !important; }
@@ -22,7 +31,9 @@
 <body>
 
     <div id="stage-welcome"><h1>你好</h1></div>
+
     <canvas id="matrix-canvas"></canvas>
+
     <div id="earth-container"></div>
     <div id="scanner"></div>
 
@@ -30,7 +41,7 @@
         <div class="hud-line">ENTITY: <span id="hud-entity">---</span></div>
         <div class="hud-line">ID: <span id="hud-id">---</span></div>
         <div class="hud-line">STATE: <span id="hud-state">---</span></div>
-        <div class="hud-line" id="hud-loc" style="display:none">COORD: 3.13° N, 101.68° E</div>
+        <div class="hud-line" id="hud-loc" style="display:none">COORD: ---</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -45,58 +56,73 @@
         const hud = document.getElementById('hud-overlay');
         const scanner = document.getElementById('scanner');
 
+        // --- 核心流程控制 ---
         async function startSequence() {
-            // 阶段 1: 白屏 5秒
+            // 1. 白屏 5秒
             await wait(5000);
             welcomeStage.classList.add('fade-out');
             setTimeout(() => welcomeStage.style.display = 'none', 1500);
 
-            // 阶段 2: 矩阵雨 30秒
+            // 2. 代码雨 (纯数字/符号/字母混合) 30秒
             initMatrix();
             matrixCanvas.style.display = 'block';
             await wait(30000);
             clearInterval(matrixInterval);
             matrixCanvas.classList.add('fade-out');
             
-            // 阶段 3: 黑屏过渡 5秒
+            // 3. 黑屏过渡 5秒
             await wait(5000);
             matrixCanvas.style.display = 'none';
 
-            // 阶段 4: 地球显示 & 锁定
+            // 4. 显示 3D 地球
             initEarth();
             earthContainer.style.display = 'block';
             hud.style.display = 'block';
             updateHUD("OBSERVING", true);
 
+            // 地球旋转 8 秒后开始锁定
             await wait(8000); 
             lockTarget();
 
-            // 阶段 5: 最终停止 (锁定后 10秒执行)
+            // 5. 锁定后 10 秒彻底静止
             await wait(10000); 
             endAllAnimations();
         }
 
         function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+        // --- 矩阵雨：仅包含数字、符号和字母 ---
         function initMatrix() {
             const ctx = matrixCanvas.getContext('2d');
             matrixCanvas.width = window.innerWidth;
             matrixCanvas.height = window.innerHeight;
+            
+            // 排除掉任何特定语言字符，仅保留标准黑客风字符
+            const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+-=[]{}|;:,.<>?".split("");
             const fontSize = 16;
-            const drops = Array(Math.floor(matrixCanvas.width / fontSize)).fill(1);
+            const columns = Math.floor(matrixCanvas.width / fontSize);
+            const drops = Array(columns).fill(1);
+
             matrixInterval = setInterval(() => {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
                 ctx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
-                ctx.fillStyle = '#0f0';
-                drops.forEach((y, i) => {
-                    const text = String.fromCharCode(0x30A0 + Math.random() * 96);
-                    ctx.fillText(text, i * fontSize, y * fontSize);
-                    if (y * fontSize > matrixCanvas.height && Math.random() > 0.975) drops[i] = 0;
+                
+                ctx.fillStyle = '#0f0'; // 经典绿色
+                ctx.font = fontSize + 'px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    
+                    if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
                     drops[i]++;
-                });
+                }
             }, 33);
         }
 
+        // --- 3D 地球渲染 ---
         let scene, camera, renderer, earth;
         function initEarth() {
             scene = new THREE.Scene();
@@ -105,8 +131,14 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             earthContainer.appendChild(renderer.domElement);
 
+            // 使用线框地球提升黑客感
             const geometry = new THREE.SphereGeometry(2, 48, 48);
-            const material = new THREE.MeshPhongMaterial({ color: 0x00ffcc, wireframe: true, transparent: true, opacity: 0.4 });
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0x00ffcc, 
+                wireframe: true, 
+                transparent: true, 
+                opacity: 0.4 
+            });
             earth = new THREE.Mesh(geometry, material);
             scene.add(earth);
 
@@ -116,7 +148,7 @@
             camera.position.z = 6;
 
             function animate() {
-                if (isStopped) return; // 核心控制：如果停止了，不再执行渲染
+                if (isStopped) return; // 停止逻辑
                 animationId = requestAnimationFrame(animate);
                 earth.rotation.y += 0.005;
                 renderer.render(scene, camera);
@@ -124,16 +156,20 @@
             animate();
         }
 
+        // --- 目标锁定 ---
         function lockTarget() {
-            // 生成随机坐标
-            const lat = (Math.random() * 180 - 90).toFixed(2);
-            const lng = (Math.random() * 360 - 180).toFixed(2);
-            document.getElementById('hud-loc').innerText = `COORD: ${Math.abs(lat)}° ${lat>=0?'N':'S'}, ${Math.abs(lng)}° ${lng>=0?'E':'W'}`;
+            // 随机坐标生成
+            const lat = (Math.random() * 180 - 90).toFixed(4);
+            const lng = (Math.random() * 360 - 180).toFixed(4);
+            const latDir = lat >= 0 ? 'N' : 'S';
+            const lngDir = lng >= 0 ? 'E' : 'W';
+            document.getElementById('hud-loc').innerText = `COORD: ${Math.abs(lat)}° ${latDir}, ${Math.abs(lng)}° ${lngDir}`;
             
             updateHUD("LOCKED", false, "#ff3333");
             document.getElementById('hud-loc').style.display = 'block';
             scanner.style.display = 'block';
             
+            // 扫描线移动
             let pos = 0;
             scannerInterval = setInterval(() => {
                 pos += 4;
@@ -141,14 +177,15 @@
                 scanner.style.top = pos + 'px';
             }, 20);
 
+            // 镜头推近效果
             let zoom = setInterval(() => {
-                if (camera.position.z > 3.5) camera.position.z -= 0.05;
+                if (camera.position.z > 3.8) camera.position.z -= 0.05;
                 else clearInterval(zoom);
             }, 30);
         }
 
         function updateHUD(state, blink, color = "#00ffcc") {
-            document.getElementById('hud-entity').innerText = "OBJECT-A";
+            document.getElementById('hud-entity').innerText = "TARGET_NODE";
             document.getElementById('hud-id').innerText = "DERR-01";
             const s = document.getElementById('hud-state');
             s.innerText = state;
@@ -156,28 +193,25 @@
             if(blink) s.classList.add('blink'); else s.classList.remove('blink');
         }
 
-        // --- 彻底停止函数 ---
+        // --- 最终停止函数 (冻结所有画面) ---
         function endAllAnimations() {
-            isStopped = true; // 1. 停止 Three.js 循环
-            cancelAnimationFrame(animationId); // 2. 销毁当前的渲染请求
+            isStopped = true; // 停止 Three.js 循环
+            cancelAnimationFrame(animationId);
+            clearInterval(scannerInterval); // 停止扫描线
             
-            clearInterval(scannerInterval); // 3. 停止扫描线计时器
-            scanner.style.display = 'none'; // 4. 隐藏扫描线
+            scanner.style.display = 'none'; // 隐藏扫描线
+            document.getElementById('hud-state').classList.remove('blink'); // 停止闪烁
             
-            const stateEl = document.getElementById('hud-state');
-            stateEl.classList.remove('blink'); // 5. 移除 HUD 闪烁类
-            
-            // 6. 视觉固化：将 HUD 变成警示红色并加边框，表示“系统已定格”
+            // 视觉定格强化
             const hudBox = document.getElementById('hud-overlay');
             hudBox.style.border = "2px solid #ff3333";
-            hudBox.style.background = "rgba(255, 0, 0, 0.2)";
+            hudBox.style.background = "rgba(255, 0, 0, 0.15)";
             hudBox.style.padding = "15px";
             hudBox.style.color = "#ff3333";
             
-            // 强制重绘地球（最后一帧静态）
+            // 手动执行最后一次渲染以确保画面定格
             renderer.render(scene, camera);
-            
-            console.log("SEQUENCE TERMINATED: STATIC MONITORING MODE.");
+            console.log("SYSTEM HALTED. DATA ARCHIVED.");
         }
 
         window.onload = startSequence;
