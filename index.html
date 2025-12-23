@@ -1,32 +1,276 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>System Override</title>
-<link rel="stylesheet" href="style.css">
-<!-- Three.js CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+    <meta charset="UTF-8">
+    <title>System Takeover - DERR-01</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* 阶段 1: 白屏欢迎 */
+        #stage-welcome {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: opacity 1s ease;
+        }
+        #stage-welcome h1 {
+            color: #333;
+            font-size: 3rem;
+            letter-spacing: 10px;
+        }
+
+        /* 阶段 2: 矩阵雨 Canvas */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            display: none;
+        }
+
+        /* 阶段 3 & 4: 3D 地球容器 */
+        #earth-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            display: none;
+        }
+
+        /* HUD 信息展示 */
+        #hud-overlay {
+            position: fixed;
+            right: 40px;
+            bottom: 40px;
+            color: #00ffcc;
+            text-shadow: 0 0 5px #00ffcc;
+            z-index: 20;
+            display: none;
+            pointer-events: none;
+        }
+
+        .hud-line {
+            margin: 5px 0;
+            font-size: 1.2rem;
+            opacity: 0.8;
+            border-left: 3px solid #00ffcc;
+            padding-left: 10px;
+        }
+
+        .scanning-line {
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 255, 204, 0.3);
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+            box-shadow: 0 0 15px #00ffcc;
+            z-index: 25;
+        }
+
+        /* 动画控制类 */
+        .fade-out { opacity: 0 !important; }
+        .blink { animation: blink-anim 0.5s infinite; }
+        @keyframes blink-anim {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+    </style>
 </head>
 <body>
 
-<!-- 阶段 1：白屏欢迎 -->
-<div id="stage-welcome" class="stage active">
-  <div class="center-text">你好</div>
-</div>
-
-<!-- 阶段 2 & 3：矩阵雨 & 3D 地球 -->
-<div id="stage-system" class="stage">
-  <canvas id="matrix-canvas"></canvas>
-  <div id="hud">
-    <div class="hud-box">
-      <div class="hud-title">ENTITY</div>
-      <div class="hud-line"><span>ID:</span> DERR-01</div>
-      <div class="hud-line"><span>STATE:</span> OBSERVING</div>
+    <div id="stage-welcome">
+        <h1>你好</h1>
     </div>
-  </div>
-</div>
 
-<script src="script.js"></script>
+    <canvas id="matrix-canvas"></canvas>
+
+    <div id="earth-container"></div>
+    <div class="scanning-line" id="scanner"></div>
+
+    <div id="hud-overlay">
+        <div class="hud-line">ENTITY: <span id="hud-entity">---</span></div>
+        <div class="hud-line">ID: <span id="hud-id">---</span></div>
+        <div class="hud-line">STATE: <span id="hud-state" class="blink">---</span></div>
+        <div class="hud-line" id="hud-loc" style="display:none">LOC: 2.31° N, 102.24° E</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        const welcomeStage = document.getElementById('stage-welcome');
+        const matrixCanvas = document.getElementById('matrix-canvas');
+        const earthContainer = document.getElementById('earth-container');
+        const hud = document.getElementById('hud-overlay');
+        const scanner = document.getElementById('scanner');
+
+        // --- 逻辑控制 ---
+
+        async function startSequence() {
+            // 1. 白屏 5秒
+            await wait(5000);
+            welcomeStage.classList.add('fade-out');
+            setTimeout(() => welcomeStage.style.display = 'none', 1000);
+
+            // 2. 矩阵雨 30秒
+            initMatrix();
+            matrixCanvas.style.display = 'block';
+            await wait(30000);
+            matrixCanvas.classList.add('fade-out');
+            
+            // 3. 过渡黑屏 5秒
+            await wait(5000);
+            matrixCanvas.style.display = 'none';
+
+            // 4. 显示地球
+            initEarth();
+            earthContainer.style.display = 'block';
+            hud.style.display = 'block';
+            updateHUD("DERR-01", "OBSERVING");
+
+            // 5. 持续一段时间后锁定
+            await wait(8000);
+            lockTarget();
+        }
+
+        function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+        // --- 矩阵雨效果 ---
+        function initMatrix() {
+            const ctx = matrixCanvas.getContext('2d');
+            matrixCanvas.width = window.innerWidth;
+            matrixCanvas.height = window.innerHeight;
+
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=";
+            const fontSize = 16;
+            const columns = matrixCanvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+
+            function draw() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+                ctx.fillStyle = '#0f0';
+                ctx.font = fontSize + 'px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+            const timer = setInterval(draw, 33);
+            matrixCanvas.dataset.timer = timer;
+        }
+
+        // --- 3D 地球效果 ---
+        let scene, camera, renderer, earth, clouds;
+        function initEarth() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            earthContainer.appendChild(renderer.domElement);
+
+            // 地球几何体
+            const geometry = new THREE.SphereGeometry(2, 64, 64);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x111111,
+                emissive: 0x072534,
+                side: THREE.DoubleSide,
+                wireframe: true // 科技感线框
+            });
+            earth = new THREE.Mesh(geometry, material);
+            scene.add(earth);
+
+            // 外围轨道环
+            const ringGeo = new THREE.RingGeometry(2.5, 2.51, 64);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            scene.add(ring);
+
+            const light = new THREE.PointLight(0x00ffcc, 1, 100);
+            light.position.set(5, 5, 5);
+            scene.add(light);
+            camera.position.z = 6;
+
+            function animate() {
+                requestAnimationFrame(animate);
+                earth.rotation.y += 0.002;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        // --- 目标锁定逻辑 ---
+        function lockTarget() {
+            updateHUD("DERR-01", "LOCKED", "#ff3333");
+            document.getElementById('hud-loc').style.display = 'block';
+            scanner.style.display = 'block';
+            
+            // 视觉反馈：放大效果
+            let zoom = { z: 6 };
+            const zoomInterval = setInterval(() => {
+                if (camera.position.z > 3.5) {
+                    camera.position.z -= 0.05;
+                } else {
+                    clearInterval(zoomInterval);
+                    // 最终扫描线循环
+                    animateScanner();
+                }
+            }, 30);
+        }
+
+        function updateHUD(id, state, color = "#00ffcc") {
+            document.getElementById('hud-entity').innerText = "OBJECT-A";
+            document.getElementById('hud-id').innerText = id;
+            const stateEl = document.getElementById('hud-state');
+            stateEl.innerText = state;
+            stateEl.style.color = color;
+        }
+
+        function animateScanner() {
+            let pos = 0;
+            setInterval(() => {
+                pos += 2;
+                if (pos > window.innerHeight) pos = 0;
+                scanner.style.top = pos + 'px';
+            }, 20);
+        }
+
+        // 启动
+        window.onload = startSequence;
+
+        // 窗口缩放适配
+        window.addEventListener('resize', () => {
+            if(camera) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
 </body>
 </html>
