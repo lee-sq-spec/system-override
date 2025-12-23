@@ -59,7 +59,7 @@ setTimeout(() => {
 }, welcomeDuration);
 
 // --------------------
-// 矩阵雨参数优化
+// 矩阵雨
 const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()*&^%';
 const fontSize = 18;
 let columns = Math.floor(canvas.width / fontSize);
@@ -97,7 +97,7 @@ let hudVisible = true;
 setInterval(()=>{ hudVisible=!hudVisible; hudBox.style.opacity = hudVisible? '1':'0.4'; },500);
 
 // --------------------
-// Three.js 3D 地球
+// Three.js 地球
 let scene, camera, renderer, earth, orbitLines;
 function initThree(){
   scene=new THREE.Scene();
@@ -130,8 +130,7 @@ function animateThree(){
   renderer.render(scene,camera);
 }
 
-// --------------------
-// 地球随机局部放大
+// 地球随机缩放
 let zoomTarget=1, zoomSpeed=0.001;
 function animateZoom(){
   requestAnimationFrame(animateZoom);
@@ -143,4 +142,3 @@ function animateZoom(){
 </script>
 </body>
 </html>
-
