@@ -5,140 +5,152 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>System Override</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-html, body { width:100%; height:100%; font-family:'Courier New', monospace; overflow:hidden; background-color:#000; }
-.stage { display:none; width:100%; height:100%; position:absolute; top:0; left:0; }
-.stage.active { display:block; }
-#stage-welcome { background-color:#fff; color:#000; display:flex; align-items:center; justify-content:center; font-size:48px; }
-#stage-system { background-color:#000; color:#0f0; }
-#matrix-canvas { width:100%; height:100%; display:block; position:absolute; top:0; left:0; z-index:0; }
-#hud { position:absolute; bottom:20px; right:20px; z-index:1; }
-.hud-box { background-color: rgba(0,0,0,0.7); border:1px solid #0f0; padding:15px; border-radius:5px; color:#0f0; }
-.hud-title { font-weight:bold; font-size:18px; margin-bottom:10px; }
-.hud-line { font-size:16px; margin:3px 0; }
-.hud-line span { font-weight:bold; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; font-family:'Courier New', monospace; overflow:hidden; background:#000; }
+
+  .stage { display:none; width:100%; height:100%; position:absolute; top:0; left:0; }
+  .stage.active { display:block; }
+
+  /* 白屏阶段 */
+  #stage-welcome { background:#fff; color:#000; display:flex; justify-content:center; align-items:center; font-size:48px; }
+
+  /* HUD */
+  #hud { position:absolute; bottom:20px; right:20px; z-index:3; color:#0f0; background:rgba(0,0,0,0.7); padding:15px; border:1px solid #0f0; border-radius:5px; display:none; }
+  #hud .hud-title { font-weight:bold; font-size:18px; margin-bottom:10px; }
+  #hud .hud-line { font-size:16px; margin:3px 0; }
+  #hud .hud-line span { font-weight:bold; }
+
+  canvas { position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
 </style>
 </head>
 <body>
 
-<div id="stage-welcome" class="stage active">
-  <div class="center-text">你好</div>
-</div>
+<!-- 白屏欢迎 -->
+<div id="stage-welcome" class="stage active">你好</div>
 
+<!-- 系统阶段 -->
 <div id="stage-system" class="stage">
-  <canvas id="matrix-canvas"></canvas>
+  <canvas id="matrix-canvas" style="z-index:0;"></canvas>
+  <canvas id="earth-canvas" style="z-index:1; display:none;"></canvas>
   <div id="hud">
-    <div class="hud-box">
-      <div class="hud-title">ENTITY</div>
-      <div class="hud-line"><span>ID:</span> DERR-01</div>
-      <div class="hud-line"><span>STATE:</span> OBSERVING</div>
-      <div class="hud-line"><span>STATUS:</span> ACTIVE</div>
-    </div>
+    <div class="hud-title">ENTITY</div>
+    <div class="hud-line"><span>ID:</span> DERR-01</div>
+    <div class="hud-line"><span>STATE:</span> OBSERVING</div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 <script>
 const welcomeDuration = 5000;
 const matrixDuration = 30000;
 
+// 元素
 const stageWelcome = document.getElementById('stage-welcome');
 const stageSystem = document.getElementById('stage-system');
-const canvas = document.getElementById('matrix-canvas');
-const ctx = canvas.getContext('2d');
+const matrixCanvas = document.getElementById('matrix-canvas');
+const matrixCtx = matrixCanvas.getContext('2d');
+const earthCanvas = document.getElementById('earth-canvas');
+const hud = document.getElementById('hud');
 
-function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+// 调整 canvas 大小
+function resizeCanvas() {
+  matrixCanvas.width = window.innerWidth;
+  matrixCanvas.height = window.innerHeight;
+  earthCanvas.width = window.innerWidth;
+  earthCanvas.height = window.innerHeight;
+}
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
-
-setTimeout(() => {
-  stageWelcome.classList.remove('active');
-  stageSystem.classList.add('active');
-  startMatrix();
-  setTimeout(()=>{ initThree(); animateThree(); animateZoom(); }, 0);
-}, welcomeDuration);
 
 // --------------------
 // 矩阵雨
 const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()*&^%';
 const fontSize = 18;
-let columns = Math.floor(canvas.width / fontSize);
-let drops = [];
-for(let x=0;x<columns;x++){
-  drops[x] = { y: Math.random()*canvas.height/fontSize, speed: 0.5 + Math.random()*2, length: 5 + Math.floor(Math.random()*20) };
-}
+let columns = Math.floor(matrixCanvas.width / fontSize);
+let drops = Array(columns).fill(0);
 
-function drawMatrix(){
-  ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.font = fontSize+"px monospace";
-
-  for(let i=0;i<drops.length;i++){
-    let drop = drops[i];
-    for(let j=0;j<drop.length;j++){
-      const text = letters.charAt(Math.floor(Math.random()*letters.length));
-      ctx.fillStyle = `rgba(0,255,0,${1-j/drop.length})`;
-      ctx.fillText(text, i*fontSize, (drop.y - j)*fontSize);
-    }
-    drop.y += drop.speed;
-    if(drop.y*fontSize > canvas.height) drop.y = 0;
+function drawMatrix() {
+  matrixCtx.fillStyle = 'rgba(0,0,0,0.05)';
+  matrixCtx.fillRect(0,0,matrixCanvas.width,matrixCanvas.height);
+  matrixCtx.fillStyle = '#0f0';
+  matrixCtx.font = fontSize + "px monospace";
+  for(let i=0;i<columns;i++){
+    const text = letters.charAt(Math.floor(Math.random()*letters.length));
+    matrixCtx.fillText(text,i*fontSize,drops[i]*fontSize);
+    if(Math.random()>0.975){ drops[i]=0; }
+    drops[i]++;
   }
 }
-
 let matrixInterval;
-function startMatrix(){
-  matrixInterval = setInterval(drawMatrix,30);
-  setTimeout(()=>{ clearInterval(matrixInterval); ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height); }, matrixDuration);
+function startMatrix() {
+  matrixInterval = setInterval(drawMatrix,50);
 }
-
-// HUD 闪烁
-const hudBox = document.querySelector('.hud-box');
-let hudVisible = true;
-setInterval(()=>{ hudVisible=!hudVisible; hudBox.style.opacity = hudVisible? '1':'0.4'; },500);
 
 // --------------------
 // Three.js 地球
-let scene, camera, renderer, earth, orbitLines;
-function initThree(){
-  scene=new THREE.Scene();
-  camera=new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight,0.1,1000);
-  camera.position.z=5;
-  renderer=new THREE.WebGLRenderer({canvas:canvas, alpha:true});
+let scene, camera, renderer, earth, orbitLines=[];
+
+function initThree() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 5;
+  renderer = new THREE.WebGLRenderer({canvas:earthCanvas, alpha:true});
   renderer.setSize(window.innerWidth, window.innerHeight);
 
-  const geometry=new THREE.SphereGeometry(1,32,32);
-  const material=new THREE.MeshBasicMaterial({color:0x00ff00, wireframe:true});
-  earth=new THREE.Mesh(geometry, material);
+  // 地球
+  const geometry = new THREE.SphereGeometry(1,32,32);
+  const material = new THREE.MeshBasicMaterial({color:0x00ff00, wireframe:true});
+  earth = new THREE.Mesh(geometry, material);
   scene.add(earth);
 
-  orbitLines=[];
+  // 轨道线
   for(let i=0;i<20;i++){
-    const curve=new THREE.EllipseCurve(0,0,1.2+Math.random()*0.5,1.2+Math.random()*0.5,0,2*Math.PI,false,0);
-    const points=curve.getPoints(50);
-    const geometry2=new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(p.x,p.y,0)));
-    const material2=new THREE.LineBasicMaterial({color:0x00ff00});
-    const line=new THREE.Line(geometry2,material2);
+    const curve = new THREE.EllipseCurve(0,0,1.2+Math.random()*0.5,1.2+Math.random()*0.5,0,2*Math.PI,false,0);
+    const points = curve.getPoints(50);
+    const geom = new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(p.x,p.y,0)));
+    const mat = new THREE.LineBasicMaterial({color:0x00ff00});
+    const line = new THREE.Line(geom, mat);
     orbitLines.push(line);
     scene.add(line);
   }
 }
 
-function animateThree(){
+function animateThree() {
   requestAnimationFrame(animateThree);
-  earth.rotation.y+=0.001;
+  earth.rotation.y += 0.001;
   orbitLines.forEach(line=>line.rotation.z+=0.002);
   renderer.render(scene,camera);
 }
 
-// 地球随机缩放
-let zoomTarget=1, zoomSpeed=0.001;
-function animateZoom(){
-  requestAnimationFrame(animateZoom);
-  if(Math.random()<0.001) zoomTarget=1+Math.random()*0.5;
-  earth.scale.x+=(zoomTarget-earth.scale.x)*zoomSpeed;
-  earth.scale.y+=(zoomTarget-earth.scale.y)*zoomSpeed;
-  earth.scale.z+=(zoomTarget-earth.scale.z)*zoomSpeed;
-}
+// --------------------
+// HUD 闪烁
+let hudVisible=true;
+setInterval(()=>{hudVisible=!hudVisible; hud.style.opacity = hudVisible?'1':'0.4';},500);
+
+// --------------------
+// 白屏结束后启动矩阵雨
+setTimeout(()=>{
+  stageWelcome.classList.remove('active');
+  stageSystem.classList.add('active');
+  startMatrix();
+}, welcomeDuration);
+
+// --------------------
+// 矩阵雨结束后显示地球
+setTimeout(()=>{
+  clearInterval(matrixInterval);
+  matrixCtx.fillStyle='#000';
+  matrixCtx.fillRect(0,0,matrixCanvas.width,matrixCanvas.height);
+
+  earthCanvas.style.display = 'block'; // 显示地球
+  initThree();
+  animateThree();
+
+  // 5秒后 HUD 信息出现
+  setTimeout(()=>{hud.style.display='block';},5000);
+
+}, welcomeDuration + matrixDuration);
+
 </script>
 </body>
 </html>
