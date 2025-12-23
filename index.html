@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Override</title>
+
+  <!-- 主样式 -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 白屏欢迎阶段 -->
+  <div id="stage-welcome" class="stage active">
+    <div class="center-text">
+      你好
+    </div>
+  </div>
+
+  <!-- 系统接管 / 黑客阶段 -->
+  <div id="stage-system" class="stage">
+    <canvas id="matrix-canvas"></canvas>
+
+    <!-- HUD 信息层 -->
+    <div id="hud">
+      <div class="hud-box">
+        <div class="hud-title">ENTITY</div>
+        <div class="hud-line"><span>ID:</span> DERR-01</div>
+        <div class="hud-line"><span>STATE:</span> OBSERVING</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主逻辑 -->
+  <script src="script.js"></script>
+</body>
+</html>
+
+/* 全局基础 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  background-color: #000; /* 默认黑屏 */
+}
+
+/* -------------------- */
+/* 舞台分区 */
+.stage {
+  display: none;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.stage.active {
+  display: block;
+}
+
+/* -------------------- */
+/* 白屏欢迎阶段 */
+#stage-welcome {
+  background-color: #fff;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+}
+
+/* -------------------- */
+/* 系统接管 / 黑客阶段 */
+#stage-system {
+  background-color: #000;
+  color: #0f0; /* 绿色黑客字 */
+}
+
+/* Canvas 全屏 */
+#matrix-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+/* -------------------- */
+/* HUD 信息层 */
+#hud {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1;
+}
+
+.hud-box {
+  background-color: rgba(0,0,0,0.7);
+  border: 1px solid #0f0;
+  padding: 15px;
+  border-radius: 5px;
+  color: #0f0;
+}
+
+.hud-title {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.hud-line {
+  font-size: 16px;
+  margin: 3px 0;
+}
+
+.hud-line span {
+  font-weight: bold;
+}
+
+// --------------------
+// 全局配置
+const welcomeDuration = 5000; // 白屏停留 5 秒
+const matrixDuration = 30000; // 矩阵雨持续 30 秒
+
+// --------------------
+// 获取舞台元素
+const stageWelcome = document.getElementById('stage-welcome');
+const stageSystem = document.getElementById('stage-system');
+const canvas = document.getElementById('matrix-canvas');
+const ctx = canvas.getContext('2d');
+
+// --------------------
+// 设置 canvas 全屏
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --------------------
+// 白屏 → 黑客阶段切换
+setTimeout(() => {
+  stageWelcome.classList.remove('active');
+  stageSystem.classList.add('active');
+  startMatrix();
+}, welcomeDuration);
+
+// --------------------
+// 矩阵雨参数
+const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()*&^%';
+const fontSize = 18;
+let columns = canvas.width / fontSize;
+let drops = [];
+for(let x=0; x<columns; x++) {
+  drops[x] = Math.floor(Math.random() * canvas.height / fontSize);
+}
+
+// --------------------
+// 矩阵雨动画
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // 产生拖尾效果
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#0f0';
+  ctx.font = fontSize + "px monospace";
+
+  for(let i=0; i<drops.length; i++) {
+    const text = letters.charAt(Math.floor(Math.random() * letters.length));
+    ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+
+    // 随机长度变化
+    if(Math.random() > 0.975) {
+      drops[i] = 0;
+    }
+
+    drops[i]++;
+  }
+}
+
+// --------------------
+// 启动矩阵雨
+let matrixInterval;
+function startMatrix() {
+  matrixInterval = setInterval(drawMatrix, 50); // 控制速度
+  setTimeout(() => {
+    clearInterval(matrixInterval); // 30秒后停止
+  }, matrixDuration);
+}
+
+// --------------------
+// 第 3 部分：矩阵雨逻辑（保留原有）
+...
+function startMatrix() {
+  matrixInterval = setInterval(drawMatrix, 50);
+  setTimeout(() => {
+    clearInterval(matrixInterval);
+  }, matrixDuration);
+}
+
+// --------------------
+// 第 4 部分：Three.js 3D 地球 + 轨道动画（追加）
+let scene, camera, renderer, earth, orbitLines;
+
+function initThree() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 5;
+
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // 地球
+  const geometry = new THREE.SphereGeometry(1, 32, 32);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    wireframe: true
+  });
+  earth = new THREE.Mesh(geometry, material);
+  scene.add(earth);
+
+  // 轨道线
+  orbitLines = [];
+  for(let i=0; i<20; i++){
+    const curve = new THREE.EllipseCurve(
+      0, 0,
+      1.2 + Math.random()*0.5, 1.2 + Math.random()*0.5,
+      0, 2*Math.PI,
+      false, 0
+    );
+    const points = curve.getPoints(50);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p.x, p.y, 0)));
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    const line = new THREE.Line(geometry, material);
+    orbitLines.push(line);
+    scene.add(line);
+  }
+}
+
+function animateThree() {
+  requestAnimationFrame(animateThree);
+
+  earth.rotation.y += 0.001;
+  orbitLines.forEach(line => line.rotation.z += 0.002);
+
+  renderer.render(scene, camera);
+}
+
+// --------------------
+// 等白屏阶段结束后，启动 Three.js
+setTimeout(() => {
+  initThree();
+  animateThree();
+}, welcomeDuration);
+
+// --------------------
+// HUD 动态闪烁
+const hudBox = document.querySelector('.hud-box');
+let hudVisible = true;
+setInterval(() => {
+  hudVisible = !hudVisible;
+  hudBox.style.opacity = hudVisible ? '1' : '0.4';
+}, 500); // 每0.5秒闪烁
+
+// --------------------
+// 地球旋转时随机局部放大
+let zoomTarget = 1;
+let zoomSpeed = 0.001;
+
+function animateZoom() {
+  requestAnimationFrame(animateZoom);
+
+  // 随机生成新的缩放目标
+  if(Math.random() < 0.001) {
+    zoomTarget = 1 + Math.random() * 0.5; // 1~1.5倍
+  }
+
+  // 平滑缩放
+  earth.scale.x += (zoomTarget - earth.scale.x) * zoomSpeed;
+  earth.scale.y += (zoomTarget - earth.scale.y) * zoomSpeed;
+  earth.scale.z += (zoomTarget - earth.scale.z) * zoomSpeed;
+}
+
+// 启动缩放动画
+setTimeout(() => {
+  animateZoom();
+}, welcomeDuration);
+
+// --------------------
+// 动画总时长控制（矩阵雨 + Three.js）
+// 30秒后恢复普通黑屏 + HUD静态
+setTimeout(() => {
+  clearInterval(matrixInterval);
+  // 清屏但保留HUD
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,canvas.width, canvas.height);
+  // 地球和轨道线停止旋转
+  orbitLines.forEach(line => line.rotation.z = 0);
+  earth.rotation.y = 0;
+}, welcomeDuration + matrixDuration);
