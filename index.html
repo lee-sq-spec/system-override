@@ -14,7 +14,7 @@
             font-family: 'Courier New', Courier, monospace;
         }
 
-        /* 阶段 1: 白屏欢迎 */
+        /* 阶段 1: 白屏 */
         #stage-welcome {
             position: fixed;
             top: 0;
@@ -26,190 +26,159 @@
             justify-content: center;
             align-items: center;
             z-index: 100;
-            transition: opacity 1s ease;
+            transition: opacity 1.5s ease;
         }
-        #stage-welcome h1 {
-            color: #333;
-            font-size: 3rem;
-            letter-spacing: 10px;
-        }
+        #stage-welcome h1 { color: #333; font-size: 3rem; letter-spacing: 10px; }
 
-        /* 阶段 2: 矩阵雨 Canvas */
+        /* 阶段 2: 矩阵雨 */
         #matrix-canvas {
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             z-index: 10;
             display: none;
+            transition: opacity 2s ease;
         }
 
-        /* 阶段 3 & 4: 3D 地球容器 */
+        /* 阶段 3 & 4: 3D 地球 */
         #earth-container {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             z-index: 5;
             display: none;
         }
 
-        /* HUD 信息展示 */
+        /* HUD 界面 */
         #hud-overlay {
             position: fixed;
-            right: 40px;
-            bottom: 40px;
+            right: 40px; bottom: 40px;
             color: #00ffcc;
             text-shadow: 0 0 5px #00ffcc;
             z-index: 20;
             display: none;
-            pointer-events: none;
         }
 
         .hud-line {
             margin: 5px 0;
             font-size: 1.2rem;
-            opacity: 0.8;
             border-left: 3px solid #00ffcc;
             padding-left: 10px;
         }
 
-        .scanning-line {
-            width: 100%;
-            height: 2px;
-            background: rgba(0, 255, 204, 0.3);
+        #scanner {
+            width: 100%; height: 2px;
+            background: rgba(0, 255, 204, 0.5);
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             display: none;
             box-shadow: 0 0 15px #00ffcc;
             z-index: 25;
         }
 
-        /* 动画控制类 */
-        .fade-out { opacity: 0 !important; }
+        /* 状态类 */
         .blink { animation: blink-anim 0.5s infinite; }
-        @keyframes blink-anim {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
-        }
+        @keyframes blink-anim { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .fade-out { opacity: 0 !important; }
     </style>
 </head>
 <body>
 
-    <div id="stage-welcome">
-        <h1>你好</h1>
-    </div>
-
+    <div id="stage-welcome"><h1>你好</h1></div>
     <canvas id="matrix-canvas"></canvas>
-
     <div id="earth-container"></div>
-    <div class="scanning-line" id="scanner"></div>
+    <div id="scanner"></div>
 
     <div id="hud-overlay">
         <div class="hud-line">ENTITY: <span id="hud-entity">---</span></div>
         <div class="hud-line">ID: <span id="hud-id">---</span></div>
-        <div class="hud-line">STATE: <span id="hud-state" class="blink">---</span></div>
-        <div class="hud-line" id="hud-loc" style="display:none">LOC: 2.31° N, 102.24° E</div>
+        <div class="hud-line">STATE: <span id="hud-state">---</span></div>
+        <div class="hud-line" id="hud-loc" style="display:none">COORD: 3.13° N, 101.68° E</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        // 全局变量用于后续停止动画
+        let matrixInterval, scannerInterval, animationId;
+        let isRotating = true;
+
         const welcomeStage = document.getElementById('stage-welcome');
         const matrixCanvas = document.getElementById('matrix-canvas');
         const earthContainer = document.getElementById('earth-container');
         const hud = document.getElementById('hud-overlay');
         const scanner = document.getElementById('scanner');
 
-        // --- 逻辑控制 ---
-
         async function startSequence() {
-            // 1. 白屏 5秒
+            // --- 阶段 1: 白屏 5秒 ---
             await wait(5000);
             welcomeStage.classList.add('fade-out');
-            setTimeout(() => welcomeStage.style.display = 'none', 1000);
+            setTimeout(() => welcomeStage.style.display = 'none', 1500);
 
-            // 2. 矩阵雨 30秒
+            // --- 阶段 2: 矩阵雨 30秒 ---
             initMatrix();
             matrixCanvas.style.display = 'block';
             await wait(30000);
+            
+            // 矩阵雨停止并消失
+            clearInterval(matrixInterval);
             matrixCanvas.classList.add('fade-out');
             
-            // 3. 过渡黑屏 5秒
+            // --- 阶段 3: 黑屏过渡 5秒 ---
             await wait(5000);
             matrixCanvas.style.display = 'none';
 
-            // 4. 显示地球
+            // --- 阶段 4: 地球显示与锁定 ---
             initEarth();
             earthContainer.style.display = 'block';
             hud.style.display = 'block';
-            updateHUD("DERR-01", "OBSERVING");
+            updateHUD("OBSERVING", true);
 
-            // 5. 持续一段时间后锁定
-            await wait(8000);
+            await wait(8000); // 旋转观察8秒后锁定
             lockTarget();
+
+            // --- 阶段 5: 最终停止 ---
+            await wait(10000); // 锁定显示10秒后彻底静止
+            endAllAnimations();
         }
 
-        function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+        function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-        // --- 矩阵雨效果 ---
+        // 矩阵雨实现
         function initMatrix() {
             const ctx = matrixCanvas.getContext('2d');
             matrixCanvas.width = window.innerWidth;
             matrixCanvas.height = window.innerHeight;
-
-            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=";
             const fontSize = 16;
-            const columns = matrixCanvas.width / fontSize;
-            const drops = Array(Math.floor(columns)).fill(1);
-
-            function draw() {
+            const drops = Array(Math.floor(matrixCanvas.width / fontSize)).fill(1);
+            
+            matrixInterval = setInterval(() => {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
                 ctx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
                 ctx.fillStyle = '#0f0';
-                ctx.font = fontSize + 'px monospace';
-
-                for (let i = 0; i < drops.length; i++) {
-                    const text = chars.charAt(Math.floor(Math.random() * chars.length));
-                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                    if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
-                        drops[i] = 0;
-                    }
+                drops.forEach((y, i) => {
+                    const text = String.fromCharCode(0x30A0 + Math.random() * 96);
+                    ctx.fillText(text, i * fontSize, y * fontSize);
+                    if (y * fontSize > matrixCanvas.height && Math.random() > 0.975) drops[i] = 0;
                     drops[i]++;
-                }
-            }
-            const timer = setInterval(draw, 33);
-            matrixCanvas.dataset.timer = timer;
+                });
+            }, 33);
         }
 
-        // --- 3D 地球效果 ---
-        let scene, camera, renderer, earth, clouds;
+        // Earth 实现
+        let scene, camera, renderer, earth;
         function initEarth() {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             earthContainer.appendChild(renderer.domElement);
 
-            // 地球几何体
-            const geometry = new THREE.SphereGeometry(2, 64, 64);
+            const geometry = new THREE.SphereGeometry(2, 48, 48);
             const material = new THREE.MeshPhongMaterial({
-                color: 0x111111,
-                emissive: 0x072534,
-                side: THREE.DoubleSide,
-                wireframe: true // 科技感线框
+                color: 0x00ffcc, wireframe: true, transparent: true, opacity: 0.4
             });
             earth = new THREE.Mesh(geometry, material);
             scene.add(earth);
-
-            // 外围轨道环
-            const ringGeo = new THREE.RingGeometry(2.5, 2.51, 64);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = Math.PI / 2;
-            scene.add(ring);
 
             const light = new THREE.PointLight(0x00ffcc, 1, 100);
             light.position.set(5, 5, 5);
@@ -217,60 +186,64 @@
             camera.position.z = 6;
 
             function animate() {
-                requestAnimationFrame(animate);
-                earth.rotation.y += 0.002;
+                animationId = requestAnimationFrame(animate);
+                if(isRotating) earth.rotation.y += 0.005;
                 renderer.render(scene, camera);
             }
             animate();
         }
 
-        // --- 目标锁定逻辑 ---
         function lockTarget() {
-            updateHUD("DERR-01", "LOCKED", "#ff3333");
+            isRotating = false; // 停止随机旋转
+            updateHUD("LOCKED", false, "#ff3333");
             document.getElementById('hud-loc').style.display = 'block';
             scanner.style.display = 'block';
             
-            // 视觉反馈：放大效果
-            let zoom = { z: 6 };
-            const zoomInterval = setInterval(() => {
-                if (camera.position.z > 3.5) {
-                    camera.position.z -= 0.05;
-                } else {
-                    clearInterval(zoomInterval);
-                    // 最终扫描线循环
-                    animateScanner();
-                }
-            }, 30);
-        }
-
-        function updateHUD(id, state, color = "#00ffcc") {
-            document.getElementById('hud-entity').innerText = "OBJECT-A";
-            document.getElementById('hud-id').innerText = id;
-            const stateEl = document.getElementById('hud-state');
-            stateEl.innerText = state;
-            stateEl.style.color = color;
-        }
-
-        function animateScanner() {
+            // 扫描线运动
             let pos = 0;
-            setInterval(() => {
-                pos += 2;
+            scannerInterval = setInterval(() => {
+                pos += 4;
                 if (pos > window.innerHeight) pos = 0;
                 scanner.style.top = pos + 'px';
             }, 20);
+
+            // 锁定放大效果
+            let zoom = setInterval(() => {
+                if (camera.position.z > 3.5) camera.position.z -= 0.05;
+                else clearInterval(zoom);
+            }, 30);
         }
 
-        // 启动
-        window.onload = startSequence;
+        function updateHUD(state, blink, color = "#00ffcc") {
+            document.getElementById('hud-entity').innerText = "OBJECT-A";
+            document.getElementById('hud-id').innerText = "DERR-01";
+            const s = document.getElementById('hud-state');
+            s.innerText = state;
+            s.style.color = color;
+            if(blink) s.classList.add('blink');
+            else s.classList.remove('blink');
+        }
 
-        // 窗口缩放适配
-        window.addEventListener('resize', () => {
-            if(camera) {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-        });
+        // --- 核心修改：停止所有动画 ---
+        function endAllAnimations() {
+            // 1. 停止扫描线
+            clearInterval(scannerInterval);
+            scanner.style.display = 'none';
+            
+            // 2. 停止地球自转 (已经在 lockTarget 里设为 false)
+            // 3. 停止渲染循环 (节省显存)
+            cancelAnimationFrame(animationId);
+            
+            // 4. UI 静态化
+            const hudBox = document.getElementById('hud-overlay');
+            hudBox.style.border = "1px solid #ff3333";
+            hudBox.style.padding = "20px";
+            hudBox.style.background = "rgba(255, 51, 51, 0.1)";
+            
+            console.log("Sequence Finished: System Standby.");
+        }
+
+        window.onload = startSequence;
     </script>
 </body>
 </html>
